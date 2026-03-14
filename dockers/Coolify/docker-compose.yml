@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  coolify:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/coollabsio/coolify:latest
+    container_name: coolify
+    restart: unless-stopped
+    env_file:
+      - ./coolify.env
+    environment:
+      # 强制指定数据库连接信息，避免默认使用 host=postgres 导致解析失败
+      DB_CONNECTION: pgsql
+      DB_HOST: coolify-db
+      DB_PORT: 5432
+      DB_DATABASE: coolify
+      DB_USERNAME: coolify
+      DB_PASSWORD: admin123456
+    volumes:
+      - coolify_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      # Coolify 容器内部监听 80 端口，这里将宿主机的 8000 映射到容器 80。
+      # 也就是说：访问 http://服务器IP:8000 -> 容器内 http://127.0.0.1:80
+      - "8000:80"
+    depends_on:
+      - coolify-db
+      - coolify-redis
+    networks:
+      - coolify-net
+
+  coolify-db:
+    image: postgres:latest
+    container_name: coolify-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: coolify
+      POSTGRES_USER: coolify
+      POSTGRES_PASSWORD: admin123456
+    volumes:
+      - coolify_db_data:/var/lib/postgresql/data
+    networks:
+      - coolify-net
+
+  coolify-redis:
+    image: redis:latest
+    container_name: coolify-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - coolify_redis_data:/data
+    networks:
+      - coolify-net
+
+networks:
+  coolify-net:
+    driver: bridge
+
+volumes:
+  coolify_data:
+  coolify_db_data:
+  coolify_redis_data:
